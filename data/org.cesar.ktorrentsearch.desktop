@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=KTorrentSearch
+GenericName=Buscador de Torrents
+Comment=Buscador nativo multi-tracker en CachyOS UI con envío directo a Transmission Qt
+Exec=ktorrentsearch %u
+Icon=transmission
+Terminal=false
+Categories=Network;FileTransfer;P2P;Qt;KDE;
+StartupNotify=true
