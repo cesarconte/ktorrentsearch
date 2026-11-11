@@ -143,6 +143,33 @@ private Q_SLOTS:
         QVERIFY(engines[1].categories.isEmpty());
     }
 
+    void testPluginVersionParsing()
+    {
+        QCOMPARE(TorrentSearchBackend::versionFromHeader(QByteArrayLiteral("# VERSION: 4.15\n# AUTHORS: x\n")), QStringLiteral("4.15"));
+        QCOMPARE(TorrentSearchBackend::versionFromHeader(QByteArrayLiteral("#VERSION:1.3.2\r\nimport re")), QStringLiteral("1.3.2"));
+        QVERIFY(TorrentSearchBackend::versionFromHeader(QByteArrayLiteral("<html>404</html>\n")).isEmpty());
+        QVERIFY(TorrentSearchBackend::versionFromHeader(QByteArray()).isEmpty());
+    }
+
+    void testVersionComparison()
+    {
+        const auto cmp = [](const char16_t *x, const char16_t *y) {
+            return TorrentSearchBackend::compareVersions(QString(x), QString(y));
+        };
+        QVERIFY(cmp(u"1.10", u"1.9") > 0); // numeric, not lexicographic
+        QVERIFY(cmp(u"1.3", u"1.4") < 0);
+        QCOMPARE(cmp(u"2.0", u"2"), 0);
+        QVERIFY(TorrentSearchBackend::compareVersions(QStringLiteral("1.0"), QString()) > 0);
+    }
+
+    void testUpstreamPluginUrl()
+    {
+        QVERIFY(TorrentSearchBackend::upstreamPluginUrl(QStringLiteral("piratebay")).toString()
+                    .contains(QStringLiteral("qbittorrent/search-plugins/master/nova3/engines/piratebay.py")));
+        QVERIFY(TorrentSearchBackend::upstreamPluginUrl(QStringLiteral("therarbg")).toString()
+                    .contains(QStringLiteral("BurningMop")));
+    }
+
     void testBackendStandaloneRuntime()
     {
         TorrentSearchBackend backend;

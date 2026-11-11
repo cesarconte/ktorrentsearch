@@ -112,6 +112,13 @@ CachyWindow {
             }
 
             CachyToolbarButton {
+                text: torrentBackend.updatingEngines ? "…" : "⟳"
+                enabled: !torrentBackend.updatingEngines
+                tooltipText: "Buscar actualizaciones de los motores de búsqueda"
+                onClicked: torrentBackend.updateEngines()
+            }
+
+            CachyToolbarButton {
                 text: "⚙"
                 checkable: true
                 checked: root.showEnginesInspector
@@ -240,15 +247,6 @@ CachyWindow {
                 }
             }
 
-            CachyDivider { Layout.fillWidth: true }
-
-            CachyToolbarButton {
-                Layout.fillWidth: true
-                iconName: "transmission"
-                text: "🧲 Fijar Transmission predeterminado"
-                tooltipText: "Asociar enlaces magnet: y archivos .torrent del sistema a Transmission Qt"
-                onClicked: torrentBackend.setTransmissionAsDefaultHandler()
-            }
         }
     ]
 
@@ -943,6 +941,13 @@ CachyWindow {
                         text: "Ninguno"
                         onClicked: torrentBackend.setAllEnginesEnabled(false)
                     }
+                }
+
+                CachyButton {
+                    Layout.fillWidth: true
+                    enabled: !torrentBackend.updatingEngines
+                    text: torrentBackend.updatingEngines ? "Comprobando actualizaciones…" : "⟳ Buscar actualizaciones"
+                    onClicked: torrentBackend.updateEngines()
                 }
 
                 QQC2.ScrollView {

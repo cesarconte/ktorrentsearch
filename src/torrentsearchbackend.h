@@ -8,7 +8,9 @@
 #include "torrentmodel.h"
 
 #include <QHash>
+#include <QNetworkAccessManager>
 #include <QObject>
+#include <QUrl>
 #include <QPointer>
 #include <QProcess>
 #include <QSettings>
@@ -45,10 +47,13 @@ class TorrentSearchBackend : public QObject
     Q_PROPERTY(QStringList recentSearches READ recentSearches NOTIFY recentSearchesChanged)
     Q_PROPERTY(bool transmissionInstalled READ transmissionInstalled CONSTANT)
     Q_PROPERTY(QString novaRuntimePath READ novaRuntimePath CONSTANT)
+    Q_PROPERTY(bool updatingEngines READ updatingEngines NOTIFY updatingEnginesChanged)
 
 public:
     explicit TorrentSearchBackend(QObject *parent = nullptr);
     ~TorrentSearchBackend() override;
+
+    bool updatingEngines() const { return m_updatingEngines; }
 
     TorrentFilterProxyModel *resultsModel() { return &m_proxyModel; }
     TorrentListModel *sourceModel() { return &m_sourceModel; }
@@ -82,17 +87,22 @@ public:
     Q_INVOKABLE void copyMagnetOrLink(const QString &link);
     Q_INVOKABLE void openDescriptionPage(const QString &descLink);
     Q_INVOKABLE void openTransmission();
-    Q_INVOKABLE void setTransmissionAsDefaultHandler();
 
     Q_INVOKABLE void setEngineEnabled(const QString &engineId, bool enabled);
     Q_INVOKABLE void setAllEnginesEnabled(bool enabled);
     Q_INVOKABLE bool installPluginFromFile(const QString &fileUrlOrPath);
     Q_INVOKABLE void refreshEngines();
+    Q_INVOKABLE void updateEngines();
     Q_INVOKABLE void clearRecentSearches();
 
     static QVector<SearchEngineInfo> parseCapabilitiesXml(const QString &xmlContent);
+    static QString pluginVersion(const QString &filePath);
+    static QString versionFromHeader(const QByteArray &head);
+    static int compareVersions(const QString &a, const QString &b);
+    static QUrl upstreamPluginUrl(const QString &engineId);
 
 Q_SIGNALS:
+    void updatingEnginesChanged();
     void totalResultsCountChanged();
     void filteredResultsCountChanged();
     void searchStateChanged();
@@ -125,4 +135,10 @@ private:
     QHash<QProcess *, QByteArray> m_processBuffers;
     int m_completedEngines = 0;
     int m_totalEnginesInSearch = 0;
+
+    QNetworkAccessManager m_network;
+    bool m_updatingEngines = false;
+    int m_updatePending = 0;
+    int m_updateFailures = 0;
+    QStringList m_updatedEngines;
 };

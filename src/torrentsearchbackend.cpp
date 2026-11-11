@@ -14,6 +14,11 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QProcessEnvironment>
+#include <QRegularExpression>
+#include <QSaveFile>
 #include <QStandardPaths>
 #include <QTimer>
 #include <QUrl>
@@ -21,6 +26,26 @@
 
 namespace {
 
+/// Python 3.14 no longer finds the system CA bundle on its own, which breaks HTTPS for some engines
+/// (e.g. TorrentProject: CERTIFICATE_VERIFY_FAILED). Point it at the distribution bundle when available.
+QProcessEnvironment pythonEnvironment()
+{
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    if (!env.contains(QStringLiteral("SSL_CERT_FILE"))) {
+        for (const QString &bundle : {QStringLiteral("/etc/ssl/certs/ca-certificates.crt"),
+                                      QStringLiteral("/etc/ca-certificates/extracted/tls-ca-bundle.pem")}) {
+            if (QFileInfo::exists(bundle)) {
+                env.insert(QStringLiteral("SSL_CERT_FILE"), bundle);
+                break;
+            }
+        }
+    }
+    env.insert(QStringLiteral("PYTHONUNBUFFERED"), QStringLiteral("1"));
+    return env;
+}
+
+/// Copies files from srcDirPath to dstDirPath. A file that already exists at the destination is
+/// only replaced when `overwrite` is set, or when the source carries a newer "# VERSION:" header.
 void copyDirectoryFiles(const QString &srcDirPath, const QString &dstDirPath, bool overwrite = false)
 {
     QDir srcDir(srcDirPath);
@@ -36,7 +61,13 @@ void copyDirectoryFiles(const QString &srcDirPath, const QString &dstDirPath, bo
     const QFileInfoList entries = srcDir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
     for (const QFileInfo &fi : entries) {
         const QString dstFile = dstDir.filePath(fi.fileName());
-        if (overwrite && QFile::exists(dstFile)) {
+        if (QFile::exists(dstFile)
+            && (overwrite
+                || (fi.suffix() == QLatin1String("py")
+                    && TorrentSearchBackend::compareVersions(
+                           TorrentSearchBackend::pluginVersion(fi.absoluteFilePath()),
+                           TorrentSearchBackend::pluginVersion(dstFile))
+                        > 0))) {
             QFile::remove(dstFile);
         }
         if (!QFile::exists(dstFile)) {
@@ -212,6 +243,7 @@ void TorrentSearchBackend::loadEnginesCapabilities()
 
     QProcess proc;
     proc.setWorkingDirectory(m_novaDir);
+    proc.setProcessEnvironment(pythonEnvironment());
     proc.start(QStringLiteral("python3"), {QStringLiteral("-I"), novaScript, QStringLiteral("--capabilities")});
     proc.waitForFinished(8000);
 
@@ -280,6 +312,7 @@ void TorrentSearchBackend::search(const QString &query)
 
         auto *proc = new QProcess(this);
         proc->setWorkingDirectory(m_novaDir);
+        proc->setProcessEnvironment(pythonEnvironment());
         m_activeProcesses.push_back(proc);
         m_processBuffers.insert(proc, QByteArray());
 
@@ -464,6 +497,7 @@ void TorrentSearchBackend::downloadByLink(const QString &link, const QString &en
 
     auto *dlProc = new QProcess(this);
     dlProc->setWorkingDirectory(m_novaDir);
+    dlProc->setProcessEnvironment(pythonEnvironment());
 
     connect(dlProc, &QProcess::finished, this, [this, dlProc, trimmedLink, displayTitle](int exitCode, QProcess::ExitStatus) {
         const QString stdoutStr = QString::fromUtf8(dlProc->readAllStandardOutput()).trimmed();
@@ -553,21 +587,6 @@ void TorrentSearchBackend::openTransmission()
     job->start();
 }
 
-void TorrentSearchBackend::setTransmissionAsDefaultHandler()
-{
-    QProcess::execute(QStringLiteral("gio"),
-                      {QStringLiteral("mime"),
-                       QStringLiteral("x-scheme-handler/magnet"),
-                       QStringLiteral("transmission-qt.desktop")});
-    QProcess::execute(QStringLiteral("gio"),
-                      {QStringLiteral("mime"),
-                       QStringLiteral("application/x-bittorrent"),
-                       QStringLiteral("transmission-qt.desktop")});
-
-    setStatusMessage(QStringLiteral("Transmission Qt configurado como cliente predeterminado para Magnet y .torrent"));
-    Q_EMIT toastNotification(QStringLiteral("Transmission Qt fijado para enlaces Magnet y .torrent"), false);
-}
-
 void TorrentSearchBackend::setEngineEnabled(const QString &engineId, bool enabled)
 {
     for (SearchEngineInfo &eng : m_engines) {
@@ -630,6 +649,128 @@ bool TorrentSearchBackend::installPluginFromFile(const QString &fileUrlOrPath)
     setStatusMessage(QStringLiteral("Plugin «%1» instalado correctamente").arg(fi.baseName()));
     Q_EMIT toastNotification(m_statusMessage, false);
     return true;
+}
+
+QString TorrentSearchBackend::pluginVersion(const QString &filePath)
+{
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    return versionFromHeader(file.read(256));
+}
+
+QString TorrentSearchBackend::versionFromHeader(const QByteArray &head)
+{
+    static const QRegularExpression re(QStringLiteral("^#\\s*VERSION:\\s*([0-9][0-9.]*)"),
+                                       QRegularExpression::CaseInsensitiveOption);
+    const QString firstLine = QString::fromUtf8(head.left(head.indexOf('\n'))).trimmed();
+    const auto match = re.match(firstLine);
+    return match.hasMatch() ? match.captured(1) : QString();
+}
+
+int TorrentSearchBackend::compareVersions(const QString &a, const QString &b)
+{
+    const QStringList pa = a.split(QLatin1Char('.'), Qt::SkipEmptyParts);
+    const QStringList pb = b.split(QLatin1Char('.'), Qt::SkipEmptyParts);
+    const int n = qMax(pa.size(), pb.size());
+    for (int i = 0; i < n; ++i) {
+        const int va = i < pa.size() ? pa.at(i).toInt() : 0;
+        const int vb = i < pb.size() ? pb.at(i).toInt() : 0;
+        if (va != vb) {
+            return va < vb ? -1 : 1;
+        }
+    }
+    return 0;
+}
+
+QUrl TorrentSearchBackend::upstreamPluginUrl(const QString &engineId)
+{
+    // Unofficial community plugins (qBittorrent wiki "Unofficial search plugins")
+    static const QHash<QString, QString> unofficial = {
+        {QStringLiteral("therarbg"),
+         QStringLiteral("https://raw.githubusercontent.com/BurningMop/qBittorrent-Search-Plugins/main/therarbg.py")},
+        {QStringLiteral("kickasstorrents"),
+         QStringLiteral("https://raw.githubusercontent.com/LightDestory/qBittorrent-Search-Plugins/master/src/engines/kickasstorrents.py")},
+    };
+    const auto it = unofficial.constFind(engineId);
+    if (it != unofficial.constEnd()) {
+        return QUrl(it.value());
+    }
+    // Official plugins repository maintained by the qBittorrent project
+    return QUrl(QStringLiteral("https://raw.githubusercontent.com/qbittorrent/search-plugins/master/nova3/engines/%1.py")
+                    .arg(engineId));
+}
+
+void TorrentSearchBackend::updateEngines()
+{
+    if (m_updatingEngines) {
+        return;
+    }
+    if (m_engines.isEmpty()) {
+        setStatusMessage(QStringLiteral("No hay motores instalados que actualizar."));
+        return;
+    }
+
+    m_updatingEngines = true;
+    m_updatePending = m_engines.size();
+    m_updatedEngines.clear();
+    m_updateFailures = 0;
+    Q_EMIT updatingEnginesChanged();
+    setStatusMessage(QStringLiteral("Comprobando actualizaciones de %1 motores…").arg(m_engines.size()));
+
+    for (const SearchEngineInfo &eng : std::as_const(m_engines)) {
+        const QString engineId = eng.id;
+        const QString engineName = eng.name;
+        QNetworkRequest req(upstreamPluginUrl(engineId));
+        req.setTransferTimeout(12000);
+        req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
+        QNetworkReply *reply = m_network.get(req);
+
+        connect(reply, &QNetworkReply::finished, this, [this, reply, engineId, engineName]() {
+            reply->deleteLater();
+            const QByteArray body = reply->error() == QNetworkReply::NoError ? reply->readAll() : QByteArray();
+
+            const QString localPath = m_novaDir + QStringLiteral("/engines/") + engineId + QStringLiteral(".py");
+            const QString remoteVersion = versionFromHeader(body);
+            const bool looksValid = !remoteVersion.isEmpty()
+                && body.contains(QByteArray("class " + engineId.toUtf8()));
+
+            if (!looksValid) {
+                // 404 / network error / not a nova3 plugin: engine has no reachable upstream, keep local copy.
+                if (reply->error() != QNetworkReply::NoError
+                    && reply->error() != QNetworkReply::ContentNotFoundError) {
+                    ++m_updateFailures;
+                }
+            } else if (compareVersions(remoteVersion, pluginVersion(localPath)) > 0) {
+                QSaveFile out(localPath);
+                if (out.open(QIODevice::WriteOnly) && out.write(body) == body.size() && out.commit()) {
+                    m_updatedEngines.append(QStringLiteral("%1 %2").arg(engineName, remoteVersion));
+                } else {
+                    ++m_updateFailures;
+                }
+            }
+
+            if (--m_updatePending > 0) {
+                return;
+            }
+
+            m_updatingEngines = false;
+            Q_EMIT updatingEnginesChanged();
+            loadEnginesCapabilities();
+
+            QString summary;
+            if (!m_updatedEngines.isEmpty()) {
+                summary = QStringLiteral("Motores actualizados: %1").arg(m_updatedEngines.join(QStringLiteral(", ")));
+            } else if (m_updateFailures > 0) {
+                summary = QStringLiteral("No se pudo comprobar %1 motor(es). Revisa tu conexión.").arg(m_updateFailures);
+            } else {
+                summary = QStringLiteral("Todos los motores ya están actualizados.");
+            }
+            setStatusMessage(summary);
+            Q_EMIT toastNotification(summary, m_updatedEngines.isEmpty() && m_updateFailures > 0);
+        });
+    }
 }
 
 void TorrentSearchBackend::refreshEngines()
