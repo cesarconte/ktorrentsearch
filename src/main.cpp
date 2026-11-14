@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
     app.setOrganizationName(QStringLiteral("Cesar"));
     app.setOrganizationDomain(QStringLiteral("cesar.org"));
     app.setDesktopFileName(QStringLiteral("org.cesar.ktorrentsearch"));
-    app.setWindowIcon(QIcon::fromTheme(QStringLiteral("ktorrent"), QIcon::fromTheme(QStringLiteral("transmission"))));
+    app.setWindowIcon(QIcon::fromTheme(QStringLiteral("org.cesar.ktorrentsearch"), QIcon::fromTheme(QStringLiteral("ktorrent"))));
 
     QQuickStyle::setStyle(QStringLiteral("org.kde.desktop"));
 
