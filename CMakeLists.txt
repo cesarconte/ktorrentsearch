@@ -38,6 +38,10 @@ find_package(KF6 ${KF_MIN_VERSION} REQUIRED COMPONENTS
 add_library(ktorrentsearch_core STATIC
     src/torrentmodel.h
     src/torrentmodel.cpp
+    src/torrentenginemanager.h
+    src/torrentenginemanager.cpp
+    src/torrentclientlauncher.h
+    src/torrentclientlauncher.cpp
     src/torrentsearchbackend.h
     src/torrentsearchbackend.cpp
 )

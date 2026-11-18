@@ -5,27 +5,20 @@
 
 #pragma once
 
+#include "torrentclientlauncher.h"
+#include "torrentenginemanager.h"
 #include "torrentmodel.h"
 
 #include <QHash>
-#include <QNetworkAccessManager>
+#include <QList>
 #include <QObject>
-#include <QUrl>
 #include <QPointer>
 #include <QProcess>
 #include <QSettings>
 #include <QStringList>
+#include <QUrl>
 #include <QVariantList>
-
-struct SearchEngineInfo {
-    QString id;
-    QString name;
-    QString url;
-    QStringList categories;
-    bool enabled = true;
-    int resultCount = 0;
-    bool running = false;
-};
+#include <QVector>
 
 class TorrentSearchBackend : public QObject
 {
@@ -53,14 +46,14 @@ public:
     explicit TorrentSearchBackend(QObject *parent = nullptr);
     ~TorrentSearchBackend() override;
 
-    bool updatingEngines() const { return m_updatingEngines; }
+    bool updatingEngines() const { return m_engineManager.isUpdatingEngines(); }
 
     TorrentFilterProxyModel *resultsModel() { return &m_proxyModel; }
     TorrentListModel *sourceModel() { return &m_sourceModel; }
 
     int totalResultsCount() const { return m_sourceModel.rowCount(); }
     int filteredResultsCount() const { return m_proxyModel.rowCount(); }
-    bool isSearching() const { return m_activeProcesses.size() > 0; }
+    bool isSearching() const { return !m_activeProcesses.isEmpty(); }
     double searchProgress() const;
     int activeEnginesCount() const { return m_activeProcesses.size(); }
     int completedEnginesCount() const { return m_completedEngines; }
@@ -72,10 +65,10 @@ public:
     QString lastSearchQuery() const { return m_lastSearchQuery; }
     QString statusMessage() const { return m_statusMessage; }
 
-    QVariantList engines() const;
-    int enabledEnginesCount() const;
+    QVariantList engines() const { return m_engineManager.enginesVariantList(); }
+    int enabledEnginesCount() const { return m_engineManager.enabledEnginesCount(); }
     QStringList recentSearches() const { return m_recentSearches; }
-    bool transmissionInstalled() const { return m_transmissionInstalled; }
+    bool transmissionInstalled() const { return m_launcher.isTransmissionInstalled(); }
     QString novaRuntimePath() const { return m_novaDir; }
 
     Q_INVOKABLE void search(const QString &query);
@@ -95,11 +88,27 @@ public:
     Q_INVOKABLE void updateEngines();
     Q_INVOKABLE void clearRecentSearches();
 
-    static QVector<SearchEngineInfo> parseCapabilitiesXml(const QString &xmlContent);
-    static QString pluginVersion(const QString &filePath);
-    static QString versionFromHeader(const QByteArray &head);
-    static int compareVersions(const QString &a, const QString &b);
-    static QUrl upstreamPluginUrl(const QString &engineId);
+    // Static forwarders for unit tests and backwards compatibility
+    static QVector<SearchEngineInfo> parseCapabilitiesXml(const QString &xmlContent)
+    {
+        return TorrentEngineManager::parseCapabilitiesXml(xmlContent);
+    }
+    static QString pluginVersion(const QString &filePath)
+    {
+        return TorrentEngineManager::pluginVersion(filePath);
+    }
+    static QString versionFromHeader(const QByteArray &head)
+    {
+        return TorrentEngineManager::versionFromHeader(head);
+    }
+    static int compareVersions(const QString &a, const QString &b)
+    {
+        return TorrentEngineManager::compareVersions(a, b);
+    }
+    static QUrl upstreamPluginUrl(const QString &engineId)
+    {
+        return TorrentEngineManager::upstreamPluginUrl(engineId);
+    }
 
 Q_SIGNALS:
     void updatingEnginesChanged();
@@ -113,32 +122,24 @@ Q_SIGNALS:
     void toastNotification(const QString &message, bool isError);
 
 private:
-    void ensureNovaRuntime();
-    void loadEnginesCapabilities();
     void setStatusMessage(const QString &msg);
-    void launchInTransmission(const QString &targetUriOrPath, const QString &displayName);
     void addRecentSearch(const QString &query);
 
     TorrentListModel m_sourceModel;
     TorrentFilterProxyModel m_proxyModel;
     QSettings m_settings;
 
+    TorrentEngineManager m_engineManager;
+    TorrentClientLauncher m_launcher;
+
     QString m_novaDir;
     QString m_currentCategory = QStringLiteral("all");
     QString m_lastSearchQuery;
     QString m_statusMessage;
     QStringList m_recentSearches;
-    bool m_transmissionInstalled = false;
 
-    QVector<SearchEngineInfo> m_engines;
     QList<QPointer<QProcess>> m_activeProcesses;
     QHash<QProcess *, QByteArray> m_processBuffers;
     int m_completedEngines = 0;
     int m_totalEnginesInSearch = 0;
-
-    QNetworkAccessManager m_network;
-    bool m_updatingEngines = false;
-    int m_updatePending = 0;
-    int m_updateFailures = 0;
-    QStringList m_updatedEngines;
 };

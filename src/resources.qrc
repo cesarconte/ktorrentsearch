@@ -1,5 +1,12 @@
 <RCC>
     <qresource prefix="/">
         <file>qml/Main.qml</file>
+        <file>qml/SidebarView.qml</file>
+        <file>qml/SearchBarCard.qml</file>
+        <file>qml/WelcomeView.qml</file>
+        <file>qml/TorrentResultRow.qml</file>
+        <file>qml/ResultsListView.qml</file>
+        <file>qml/EnginesInspectorDrawer.qml</file>
+        <file>qml/ToastOverlay.qml</file>
     </qresource>
 </RCC>
