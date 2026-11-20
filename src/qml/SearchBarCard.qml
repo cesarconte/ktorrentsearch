@@ -49,7 +49,8 @@ CachyCard {
             CachyButton {
                 primary: !torrentBackend.isSearching
                 destructive: torrentBackend.isSearching
-                text: torrentBackend.isSearching ? "⏹ Detener" : "🔍 Buscar"
+                iconName: torrentBackend.isSearching ? "media-playback-stop" : "edit-find"
+                text: torrentBackend.isSearching ? "Detener" : "Buscar"
                 onClicked: {
                     if (torrentBackend.isSearching) {
                         torrentBackend.stopSearch();

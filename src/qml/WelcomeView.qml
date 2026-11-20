@@ -33,10 +33,11 @@ Item {
                     GradientStop { position: 1.0; color: "#30D158" }
                 }
 
-                Text {
+                CachyIcon {
                     anchors.centerIn: parent
-                    text: "🧲"
-                    font.pixelSize: 24
+                    name: "download"
+                    size: 26
+                    color: "#FFFFFF"
                 }
             }
 

@@ -97,10 +97,11 @@ Rectangle {
                 ? Qt.rgba(0.04, 0.52, 1.0, 0.35)
                 : Qt.rgba(0.75, 0.35, 0.95, 0.35)
 
-            Text {
+            CachyIcon {
                 anchors.centerIn: parent
-                text: root.isMagnet ? "🧲" : "📦"
-                font.pixelSize: 16
+                name: root.isMagnet ? "download" : "package-x-generic"
+                size: 16
+                color: root.isMagnet ? "#0A84FF" : "#BF5AF2"
             }
         }
 
@@ -151,7 +152,7 @@ Rectangle {
 
                 // Size Badge
                 Text {
-                    text: "💾 " + root.formattedSize
+                    text: root.formattedSize
                     font.pixelSize: 11
                     font.weight: Font.Medium
                     color: CachyTheme.textSecondary
@@ -160,7 +161,7 @@ Rectangle {
                 // Date Badge
                 Text {
                     visible: root.formattedDate !== "—"
-                    text: "📅 " + root.formattedDate
+                    text: root.formattedDate
                     font.pixelSize: 11
                     color: CachyTheme.textMuted
                 }
@@ -221,21 +222,22 @@ Rectangle {
             spacing: 6
 
             CachyToolbarButton {
-                text: "🔗"
+                iconName: "edit-copy"
                 tooltipText: root.isMagnet ? "Copiar enlace Magnet al portapapeles" : "Copiar URL del torrent"
                 onClicked: torrentBackend.copyMagnetOrLink(root.link)
             }
 
             CachyToolbarButton {
                 visible: root.descLink.length > 0
-                text: "🌐"
+                iconName: "internet-web-browser"
                 tooltipText: "Abrir página del torrent en el navegador"
                 onClicked: torrentBackend.openDescriptionPage(root.descLink)
             }
 
             CachyButton {
                 primary: true
-                text: "⬇ Descargar"
+                iconName: "download"
+                text: "Descargar"
                 onClicked: torrentBackend.downloadByLink(root.link, root.engineId, root.name)
             }
         }

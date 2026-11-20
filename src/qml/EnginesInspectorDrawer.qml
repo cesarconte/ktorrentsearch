@@ -37,7 +37,7 @@ ColumnLayout {
         }
 
         CachyToolbarButton {
-            text: "✕"
+            iconName: "window-close"
             tooltipText: "Cerrar panel de motores"
             onClicked: root.closeRequested()
         }
@@ -72,7 +72,8 @@ ColumnLayout {
     CachyButton {
         Layout.fillWidth: true
         enabled: !torrentBackend.updatingEngines
-        text: torrentBackend.updatingEngines ? "Comprobando actualizaciones…" : "⟳ Buscar actualizaciones"
+        iconName: "view-refresh"
+        text: torrentBackend.updatingEngines ? "Comprobando actualizaciones…" : "Buscar actualizaciones"
         onClicked: torrentBackend.updateEngines()
     }
 
@@ -143,7 +144,8 @@ ColumnLayout {
     CachyButton {
         Layout.fillWidth: true
         primary: true
-        text: "+ Instalar plugin (.py)…"
+        iconName: "list-add"
+        text: "Instalar plugin (.py)…"
         onClicked: root.openPluginDialog()
     }
 }

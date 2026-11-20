@@ -39,7 +39,7 @@ ColumnLayout {
             required property var modelData
             Layout.fillWidth: true
             text: modelData.label
-            iconGlyph: modelData.glyph
+            iconName: modelData.iconName || ""
             iconColor: modelData.color
             squircleIconBadge: true
             badgeText: torrentBackend.currentCategory === modelData.id && torrentBackend.totalResultsCount > 0
@@ -91,7 +91,7 @@ ColumnLayout {
     CachySidebarItem {
         Layout.fillWidth: true
         text: "Todos los motores"
-        iconGlyph: "🌐"
+        iconName: "network-workgroup"
         iconColor: "#0A84FF"
         badgeText: torrentBackend.totalResultsCount > 0 ? torrentBackend.totalResultsCount.toString() : ""
         selected: torrentBackend.resultsModel.engineFilter === "all"

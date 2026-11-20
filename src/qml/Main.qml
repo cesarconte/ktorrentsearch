@@ -32,14 +32,14 @@ CachyWindow {
     property bool toastError: false
 
     readonly property var categoryList: [
-        { id: "all",      label: "Todo",       glyph: "❖", color: "#007AFF" },
-        { id: "movies",   label: "Películas",  glyph: "🎬", color: "#FF453A" },
-        { id: "tv",       label: "Series TV",  glyph: "📺", color: "#BF5AF2" },
-        { id: "music",    label: "Música",     glyph: "🎵", color: "#FF2D55" },
-        { id: "games",    label: "Juegos",     glyph: "🎮", color: "#30D158" },
-        { id: "software", label: "Software",   glyph: "💿", color: "#5AC8FA" },
-        { id: "anime",    label: "Anime",      glyph: "✦", color: "#FF9F0A" },
-        { id: "books",    label: "Libros",     glyph: "📚", color: "#FFD60A" }
+        { id: "all",      label: "Todo",       iconName: "applications-system", color: "#007AFF" },
+        { id: "movies",   label: "Películas",  iconName: "video-x-generic",     color: "#FF453A" },
+        { id: "tv",       label: "Series TV",  iconName: "video-television",    color: "#BF5AF2" },
+        { id: "music",    label: "Música",     iconName: "audio-x-generic",     color: "#FF2D55" },
+        { id: "games",    label: "Juegos",     iconName: "games-config-options",color: "#30D158" },
+        { id: "software", label: "Software",   iconName: "system-software-install", color: "#5AC8FA" },
+        { id: "anime",    label: "Anime",      iconName: "media-optical",       color: "#FF9F0A" },
+        { id: "books",    label: "Libros",     iconName: "x-office-document",   color: "#FFD60A" }
     ]
 
     function currentCategoryTitle() {
@@ -106,20 +106,20 @@ CachyWindow {
             anchors.verticalCenter: parent.verticalCenter
 
             CachyToolbarButton {
-                text: "⚡"
+                iconName: "network-workgroup"
                 tooltipText: "Abrir Transmission Qt"
                 onClicked: torrentBackend.openTransmission()
             }
 
             CachyToolbarButton {
-                text: torrentBackend.updatingEngines ? "…" : "⟳"
+                iconName: "view-refresh"
                 enabled: !torrentBackend.updatingEngines
                 tooltipText: "Buscar actualizaciones de los motores de búsqueda"
                 onClicked: torrentBackend.updateEngines()
             }
 
             CachyToolbarButton {
-                text: "⚙"
+                iconName: "configure"
                 checkable: true
                 checked: root.showEnginesInspector
                 tooltipText: "Gestionar motores y plugins de búsqueda (.py)"
@@ -185,7 +185,7 @@ CachyWindow {
 
             CachyToolbarButton {
                 iconName: "view-filter"
-                text: torrentBackend.resultsModel.minSeeds > 0 ? "▲ Con semillas (ON)" : "▲ Con semillas"
+                text: "Solo con semillas"
                 checkable: true
                 checked: torrentBackend.resultsModel.minSeeds > 0
                 tooltipText: "Ocultar torrents muertos sin semillas (seeds = 0)"
